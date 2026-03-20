@@ -89,8 +89,9 @@ EOF
 
 ```bash
 init_local_repo() {
-  mkdir -p ~/.claude/myskills
-  cd ~/.claude/myskills
+  local skills_dir="$HOME/.claude/skills"
+
+  cd "$skills_dir"
 
   # 初始化git仓库
   git init
@@ -100,6 +101,7 @@ init_local_repo() {
 .DS_Store
 *.log
 *.tmp
+.*.swp
 EOF
 
   # 创建初始README
@@ -110,6 +112,16 @@ EOF
 
 ## Skills列表
 
+EOF
+  ls -1 "$skills_dir" | grep -v '^\.' | sed 's/^/- /' >> README.md
+
+  cat >> README.md << 'EOF'
+
+## 同步信息
+
+- **同步方式**: SSH (无需token，更安全)
+- **自动触发**: 每次Claude Code启动时
+- **手动触发**: 对话中说"同步skills到GitHub"
 EOF
 
   git add .
@@ -128,22 +140,13 @@ EOF
 
 ```bash
 sync_skills() {
-  local source_dir="$HOME/.claude/skills"
-  local target_dir="$HOME/.claude/myskills"
+  local skills_dir="$HOME/.claude/skills"
 
-  cd "$target_dir"
+  cd "$skills_dir"
 
   # 拉取最新变更
   echo "📥 拉取远程更新..."
   git pull origin main --no-edit
-
-  # 复制所有skills到仓库
-  echo "📦 同步skills..."
-  rsync -av --delete \
-    "$source_dir/" \
-    "$target_dir/skills/" \
-    --exclude='.git' \
-    --exclude='.DS_Store'
 
   # 检查是否有变更
   if [ -n "$(git status --porcelain)" ]; then
@@ -182,7 +185,7 @@ main() {
   fi
 
   # 2. 检查本地仓库
-  if [ ! -d ~/.claude/myskills/.git ]; then
+  if [ ! -d ~/.claude/skills/.git ]; then
     echo "📁 初始化本地仓库..."
     init_local_repo
   fi
@@ -244,9 +247,8 @@ echo "✅ SSH连接: $(ssh -T git@github.com 2>&1 | grep -o 'Hi [^!]*')"
 ```bash
 echo "🎉 开始首次同步..."
 
-# 创建本地仓库
-mkdir -p ~/.claude/myskills
-cd ~/.claude/myskills
+# 在skills目录直接初始化
+cd ~/.claude/skills
 git init
 
 # 创建初始文件
@@ -256,16 +258,14 @@ cat > README.md << 'EOF'
 这个仓库存储我所有的Claude Code skills，通过自动同步工具维护。
 
 EOF
+ls -1 ~/.claude/skills | grep -v '^\.' | sed 's/^/- /' >> README.md
 
 cat > .gitignore << 'EOF'
 .DS_Store
 *.log
 *.tmp
+.*.swp
 EOF
-
-# 复制skills
-echo "📦 复制skills..."
-rsync -av ~/.claude/skills/ skills/ --exclude='.DS_Store'
 
 # 初始提交
 git add .
@@ -275,7 +275,7 @@ git commit -m "Initial commit: Sync Claude Code skills"
 git remote add origin git@github.com:$(git config user.name)/myskills.git
 git branch -M main
 
-# 推送（自动创建远程仓库）
+# 推送
 echo "📤 推送到GitHub..."
 git push -u origin main
 
@@ -439,8 +439,7 @@ Already up to date.
 
 ## 相关文件
 
-- `~/.claude/skills/` - 本地skills目录
-- `~/.claude/myskills/` - 同步仓库本地副本
+- `~/.claude/skills/` - 本地skills目录（同时是git仓库）
 - `~/.ssh/id_ed25519` - SSH私钥
 - `~/.claude/settings.json` - Claude Code配置（hooks）
 
